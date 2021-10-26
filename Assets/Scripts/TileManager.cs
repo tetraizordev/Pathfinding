@@ -129,19 +129,44 @@ public class TileManager : MonoBehaviour
         {
             if(Input.GetKeyDown(KeyCode.F))
             {
-                foreach(Node node in pathfinder.FindPath(new Vector2Int(1,1), new Vector2Int(gridSize.x - 1, gridSize.y - 1), 1))
+                double timer = Time.realtimeSinceStartupAsDouble;
+
+                foreach(Node node in pathfinder.FindPath(new Vector2Int(1,1), new Vector2Int(gridSize.x - 1, gridSize.y - 1), 1, true))
                 {
-                    print(node.position);
                     AddTile(node.position, 5, 3);
                 }
+
+                print("Finished finding path without corner cutting at " + (Time.realtimeSinceStartupAsDouble - timer)*1000 + " ms.");
+
+                timer = Time.realtimeSinceStartupAsDouble;
+
+                foreach(Node node in pathfinder.FindPath(new Vector2Int(1,1), new Vector2Int(gridSize.x - 1, gridSize.y - 1), 1, false))
+                {
+                    //AddTile(node.position, 6, 3);
+                }
+
+                print("Finished finding path with corner cutting at " + (Time.realtimeSinceStartupAsDouble - timer)*1000 + " ms.");
             }
 
             if(Input.GetKeyDown(KeyCode.G))
             {
-                foreach(Node node in pathfinder.FindNeighbours(pathfinder.nodes[1, mouseToCellPosition.x, mouseToCellPosition.y]))
+                double timer = Time.realtimeSinceStartupAsDouble;
+                int neighbourCount = 0;
+                foreach(Node node in pathfinder.FindNeighbours(pathfinder.nodes[1, mouseToCellPosition.x, mouseToCellPosition.y], false))
                 {
-                    print(node.position);
+                    neighbourCount++;
                 }
+                print("Took " + (Time.realtimeSinceStartupAsDouble - timer)*1000 + " ms to calculate, found " + neighbourCount + " nodes.");
+
+                neighbourCount = 0;
+
+                timer = Time.realtimeSinceStartupAsDouble;
+
+                foreach(Node node in pathfinder.FindNeighbours(pathfinder.nodes[1, mouseToCellPosition.x, mouseToCellPosition.y], true))
+                {
+                    neighbourCount++;
+                }
+                print("Took " + (Time.realtimeSinceStartupAsDouble - timer)*1000 + " ms to calculate, found " + neighbourCount + " nodes.");
             }
         }
 
@@ -184,7 +209,7 @@ public class TileManager : MonoBehaviour
         }
 
         // Place tile to the correct layer.
-        print("Layer: " + _layer + ", Cell Position: " + _cellPosition + ", Tile Index: " + _tileIndex);
+        // print("Layer: " + _layer + ", Cell Position: " + _cellPosition + ", Tile Index: " + _tileIndex);
         tilemapLayers[_layer].SetTile((Vector3Int)_cellPosition, tileObjectList[_tileIndex].tile[Random.Range(0, tileObjectList[_tileIndex].tile.Length)]);
         
         // Add tile data to node list.
@@ -196,14 +221,14 @@ public class TileManager : MonoBehaviour
         // Check if position is not out of bounds.
         if(_cellPosition.x < 0 || _cellPosition.y < 0)
         {
-            print("Cell position cannot be below 0. Tried to place at: " + _cellPosition);
+            //print("Cell position cannot be below 0. Tried to place at: " + _cellPosition);
             return;
         }
 
         // Check if position is exceding the max grid size.
         if(_cellPosition.x >= gridSize.x || _cellPosition.y >= gridSize.y)
         {
-            print("Cell position cannot be above max grid size. Tried to place at: " + _cellPosition);
+            //print("Cell position cannot be above max grid size. Tried to place at: " + _cellPosition);
             return;
         }
 
