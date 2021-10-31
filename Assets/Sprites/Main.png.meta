@@ -72,6 +72,7 @@ TextureImporter:
   streamingMipmaps: 0
   streamingMipmapsPriority: 0
   vTOnly: 0
+  ignoreMasterTextureLimit: 0
   grayScaleToAlpha: 0
   generateCubemap: 6
   cubemapConvolution: 0
@@ -484,6 +485,23 @@ TextureImporter:
     edges: []
     weights: []
     secondaryTextures: []
+    nameFileIdTable:
+      Grass4: -6628639966651196924
+      Stone2: 8117856743858075646
+      Sand2: 8801126876103537992
+      Grass1: -2684102947291226346
+      Green: -1352394335780442164
+      Red: -6918395526411785724
+      Grass3: -3786798510214886919
+      Stone1: 2211714010249429090
+      Stone3: 1754470625983004797
+      Mud1: -1149673380122903276
+      Sand1: 1057461262287701629
+      Stone4: 363456832346505798
+      Mud2: -1877753079322562185
+      Yellow: -1808039550651168064
+      Blue: -4506707602248226088
+      Grass2: 8350362020719645861
   spritePackingTag: 
   pSDRemoveMatte: 0
   pSDShowRemoveMatteOption: 0

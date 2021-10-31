@@ -9,32 +9,36 @@ public class TileManager : MonoBehaviour
     [Header("Assignments")]
     Grid mainGrid;
     Pathfinder pathfinder;
+    GameManager gameManager;
 
     [Space(10)]
     [Header("Lists")]
 
-    public List<Tilemap> tilemapLayers = new List<Tilemap>();
-
-    public List<TileObject> tileObjectList = new List<TileObject>();
+    public List<Tilemap> tilemapLayers = new List<Tilemap>(); // All the layers of the tilemap renderer
+    public List<TileObject> tileObjectList = new List<TileObject>(); // All the tiles and the properties of them
+    public List<Node> path = new List<Node>(); // Last generated path
 
     [Space(10)]
     [Header("States")]
-    public bool canBuild = true;
-    public bool isChoosingPath;
+    public bool canBuild = true; // Building - Path choosing state
+    public bool isChoosingPath = false;
+
+    public bool isMousePosChanged; // Check if mouse position converted to cell position changed
 
     [Space(10)]
     [Header("Values")]
+    public Vector2Int mouseToCellPosition = new Vector2Int(0, 0); // Mouse position converted to cell position
+    Vector2Int gridSize = new Vector2Int(0, 0); // World grid size
 
-    public Vector3Int mouseToCellPosition = new Vector3Int(0, 0, 0);
+    Vector2Int lastTilePosition;
+    Vector2Int startPosition;
+    Vector2Int targetPosition;
 
-    Vector3Int lastTilePosition;
-
-    public Vector2Int gridSize = new Vector2Int(24, 24);
-
-    int tileChosenIndex = 2;
-
-    void Start()
+    void Awake() // Do the assignments.
     {
+        // Get the GameManager component from GameManager object.
+        gameManager = GameObject.Find("GameManager").GetComponent<GameManager>();
+
         // Get the Grid component from the object. 
         mainGrid = gameObject.GetComponent<Grid>();
 
@@ -47,8 +51,12 @@ public class TileManager : MonoBehaviour
         {
             print("Cannot find the Pathfinder object.");
         }
-        
+    }
 
+    void Start()
+    {
+        
+        
         // Add all tile layers to the list.
         foreach(Tilemap tilemapObject in GetComponentsInChildren<Tilemap>()) 
         {
@@ -61,119 +69,90 @@ public class TileManager : MonoBehaviour
                 print("No layers created in Grid.");
             }
         }
-
-        
-        // GENERATE STARTING GRID
-
-        // Create node list.
-        pathfinder.nodes = new Node[tilemapLayers.Count, gridSize.x, gridSize.y];
-        pathfinder.gridSize = gridSize;
-
-        // Create a rectangle with grass tiles.
-        for(int x = 0; x < gridSize.x; x++)
-        {
-           for(int y = 0; y < gridSize.y; y++)
-           {
-               AddTile((new Vector2Int(x, y)), 1, 0);
-               AddTile((new Vector2Int(x, y)), 0, 1);
-               AddTile((new Vector2Int(x, y)), 0, 2);
-               AddTile((new Vector2Int(x, y)), 0, 3);
-           }
-        }
-        
     }
 
     void Update()
     {
         // Get mouse position as cell position.
-        mouseToCellPosition = mainGrid.WorldToCell(Camera.main.ScreenToWorldPoint(Input.mousePosition));
+        mouseToCellPosition = (Vector2Int)mainGrid.WorldToCell(Camera.main.ScreenToWorldPoint(Input.mousePosition));
         
-        // If cell position has changed, update the preview tile.
-        if (mouseToCellPosition != lastTilePosition) 
+        // Check if mouse pos changed.
+        isMousePosChanged = (mouseToCellPosition != lastTilePosition);
+
+        // If mouse pos changed, update the preview tile.
+        if(isMousePosChanged)
         {
-            if(canBuild)
+            gameManager.mousePositionText.text = "Mouse Position: " + mouseToCellPosition;
+
+            if(!isChoosingPath)
             {
                 // Set a preview tile on the current cell.
-                tilemapLayers[2].SetTile(mouseToCellPosition, tileObjectList[tileChosenIndex].tile[Random.Range(0, tileObjectList[tileChosenIndex].tile.Length)]);
-            
+                tilemapLayers[2].SetTile((Vector3Int)mouseToCellPosition, tileObjectList[2].tile[0]);
+                
                 // Set the last cell as null.
-                tilemapLayers[2].SetTile(lastTilePosition, null);
+                tilemapLayers[2].SetTile((Vector3Int)lastTilePosition, null);
             }
             else
             {
-                tilemapLayers[2].SetTile(lastTilePosition, null);
-                tilemapLayers[2].SetTile(mouseToCellPosition, null);
+                tilemapLayers[2].SetTile((Vector3Int)lastTilePosition, null);
+                tilemapLayers[2].SetTile((Vector3Int)mouseToCellPosition, null);
             }
         }
 
         // Set last position as the current position.
         lastTilePosition = mouseToCellPosition;
-        
+
+        // Build tiles.
         if(canBuild)
         {
-            // Add a tile with left click.
-            if (Input.GetMouseButton(0)) 
+            if(IsInsideOfTheGridBounds(mouseToCellPosition))
             {
-                AddTile((Vector2Int)mouseToCellPosition, 2, 1);
-            }
+                // Add a tile with left click.
+                if (Input.GetMouseButton(0)) 
+                {
+                    AddTile(mouseToCellPosition, 2, 1);
+                    UpdatePath();
+                }
 
-            // Remove a tile with right click.
-            if (Input.GetMouseButton(1)) 
-            {
-                RemoveTile((Vector2Int)mouseToCellPosition, 1);
+                // Remove a tile with right click.
+                if (Input.GetMouseButton(1)) 
+                {
+                    RemoveTile(mouseToCellPosition, 1);
+                    UpdatePath();
+                }
             }
-
         }
-
+        
+        // If currently choosing path
         if(isChoosingPath)
         {
-            if(Input.GetKeyDown(KeyCode.F))
+            // Check if mouse position actually changed, and if it is not the same, so that the code does not run every frame.
+            if(isMousePosChanged && CheckTileIndex(mouseToCellPosition, 4) != 6)
             {
-                double timer = Time.realtimeSinceStartupAsDouble;
-
-                foreach(Node node in pathfinder.FindPath(new Vector2Int(1,1), new Vector2Int(gridSize.x - 1, gridSize.y - 1), 1, true))
+                // Check if it is inside the bounds of the grid.
+                if(IsInsideOfTheGridBounds(mouseToCellPosition))
                 {
-                    AddTile(node.position, 5, 3);
+                    // Change the position of starting node.
+                    if(Input.GetMouseButton(0))
+                    {
+                        RemoveTile(startPosition, 4);
+                        AddTile(mouseToCellPosition, 6, 4);
+                        startPosition = mouseToCellPosition;
+                        
+                        UpdatePath();
+                    }
+
+                    // Change the position of target node.
+                    if(Input.GetMouseButton(1))
+                    {
+                        RemoveTile(targetPosition, 4);
+                        AddTile(mouseToCellPosition, 6, 4);
+                        targetPosition = mouseToCellPosition;
+
+                        UpdatePath();
+                    }
                 }
-
-                print("Finished finding path without corner cutting at " + (Time.realtimeSinceStartupAsDouble - timer)*1000 + " ms.");
-
-                timer = Time.realtimeSinceStartupAsDouble;
-
-                foreach(Node node in pathfinder.FindPath(new Vector2Int(1,1), new Vector2Int(gridSize.x - 1, gridSize.y - 1), 1, false))
-                {
-                    //AddTile(node.position, 6, 3);
-                }
-
-                print("Finished finding path with corner cutting at " + (Time.realtimeSinceStartupAsDouble - timer)*1000 + " ms.");
-            }
-
-            if(Input.GetKeyDown(KeyCode.G))
-            {
-                double timer = Time.realtimeSinceStartupAsDouble;
-                int neighbourCount = 0;
-                foreach(Node node in pathfinder.FindNeighbours(pathfinder.nodes[1, mouseToCellPosition.x, mouseToCellPosition.y], false))
-                {
-                    neighbourCount++;
-                }
-                print("Took " + (Time.realtimeSinceStartupAsDouble - timer)*1000 + " ms to calculate, found " + neighbourCount + " nodes.");
-
-                neighbourCount = 0;
-
-                timer = Time.realtimeSinceStartupAsDouble;
-
-                foreach(Node node in pathfinder.FindNeighbours(pathfinder.nodes[1, mouseToCellPosition.x, mouseToCellPosition.y], true))
-                {
-                    neighbourCount++;
-                }
-                print("Took " + (Time.realtimeSinceStartupAsDouble - timer)*1000 + " ms to calculate, found " + neighbourCount + " nodes.");
-            }
-        }
-
-        // Check the index of the mouse position.
-        if(Input.GetKeyDown(KeyCode.Space))
-        {
-            print(CheckTileIndex((Vector2Int)mouseToCellPosition, 1));
+            }   
         }
     }
 
@@ -237,12 +216,96 @@ public class TileManager : MonoBehaviour
             pathfinder.nodes[_layer, _cellPosition.x, _cellPosition.y] = new Node(_cellPosition, tileObjectList[0].weight, tileObjectList[0].passable, 0, _layer);
     }
 
-    // TODO: Comment here.
+    // CREATE A STARTING GRID
+    public void CreateGrid(Vector2Int _gridSize)
+    {
+        // GENERATE STARTING GRID
+        
+        // Reset tilemap.
+        for(int z = 0; z < tilemapLayers.Count; z++)
+        {
+            for(int x = 0; x < gridSize.x; x++)
+            {
+               for(int y = 0; y < gridSize.y; y++)
+                {
+                    tilemapLayers[z].SetTile(new Vector3Int(x, y, 0), tileObjectList[0].tile[0]);
+                } 
+            }
+        }
+        
+        // Set the local gridsSize variable.
+        gridSize = _gridSize;
+
+        // Create node list.
+        pathfinder.nodes = new Node[tilemapLayers.Count, _gridSize.x, _gridSize.y];
+        pathfinder.gridSize = _gridSize;
+
+        // Create a rectangle with grass tiles.
+        for(int x = 0; x < _gridSize.x; x++)
+        {
+           for(int y = 0; y < _gridSize.y; y++)
+           {
+               AddTile((new Vector2Int(x, y)), 1, 0);
+               AddTile((new Vector2Int(x, y)), 0, 1);
+               AddTile((new Vector2Int(x, y)), 0, 2);
+               AddTile((new Vector2Int(x, y)), 0, 3);
+               AddTile((new Vector2Int(x, y)), 0, 4);
+           }
+        }
+
+        // Create start and target nodes.
+        AddTile(new Vector2Int(1, 1), 6, 4);
+        startPosition = new Vector2Int(1, 1);
+
+        AddTile(new Vector2Int(_gridSize.x - 2, _gridSize.y - 2), 6, 4);
+        targetPosition = new Vector2Int(_gridSize.x - 2, _gridSize.y - 2);
+
+        // Set camera position.
+        Camera.main.transform.position = new Vector3(gridSize.x / 2, gridSize.y / 2, -10);
+        Camera.main.orthographicSize = gridSize.y / 2 + 2;
+
+        // Update path.
+        UpdatePath();
+    }
+
+    // UPDATE THE RENDER OF THE PATH
+    public void UpdatePath()
+    {
+        // Check if the path is actually set.
+        if(path != null)
+        {
+            // Remove the previous path.
+            foreach(Node node in path)
+            {
+                RemoveTile(node.position, 3);
+            }
+        }
+
+        // Update the path with the new findings.     
+        path = pathfinder.FindPath(startPosition, targetPosition, 1, true);
+
+        // Draw the path.
+        foreach(Node node in path)
+        {
+            AddTile(node.position, 5, 3);
+        }
+    }
+
+    // CHECK THE TILE INDEX AT A SPESIFIC POSITION GIVEN. RETURN THE INDEX OF THE TILE, IF A PROBLEM OCCURS, RETURN "-1"
     public int CheckTileIndex(Vector2Int _positionToCheck, int _layer)
     {
-        if(_positionToCheck.x < 0 || _positionToCheck.y < 0)
+
+
+
+        // Check if pathfinder node list is empty;
+        if(pathfinder.nodes == null)
         {
-            // DISABLED: print("Out of bounds at " + _positionToCheck + ". Returning -1.");
+            return -1;
+        }
+
+        // Check if the position given is inside the bounds of the grid.
+        if(!IsInsideOfTheGridBounds(_positionToCheck))
+        {
             return -1;
         }
         if(pathfinder.nodes[_layer, _positionToCheck.x, _positionToCheck.y] != null)
@@ -258,8 +321,13 @@ public class TileManager : MonoBehaviour
         }
         else
         {
-            // DISABLED: print("Tile is null at " + _positionToCheck + ". Returning -1.");
             return -1;
         }
+    }
+
+    // CHECK IF THE GIVEN POSITION IS INSIDE THE BOUNDARIES OF THE CURRENT GRID.
+    public bool IsInsideOfTheGridBounds(Vector2Int _positionToCheck)
+    {
+        return (_positionToCheck.x >= 0 && _positionToCheck.y >= 0 && _positionToCheck.x < gridSize.x && _positionToCheck.y < gridSize.y);
     }
 }

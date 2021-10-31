@@ -59,3 +59,15 @@ Update Mode: updateDependencies
 
 The following packages were updated:
   com.unity.collab-proxy from version 1.9.0 to 1.13.5
+
+=== Fri Oct 29 20:32:13 2021
+
+Packages were changed.
+Update Mode: updateDependencies
+
+The following packages were updated:
+  com.unity.2d.animation from version 6.0.5 to 7.0.0
+  com.unity.2d.psdimporter from version 5.0.4 to 6.0.0
+  com.unity.2d.spriteshape from version 6.0.1 to 7.0.0
+  com.unity.timeline from version 1.5.6 to 1.6.2
+  com.unity.visualscripting from version 1.6.1 to 1.7.2
